@@ -6,24 +6,25 @@ import android.graphics.Paint;
 
 public class Obstacle {
     private int x; // Pozice trubky na ose X (jak je daleko vpravo).
-    private int screenHeight; // Výška obrazovky.
-    private int width; // Šířka trubky.
-    private int gap; // Velikost mezery, kterou ptáček prolétá.
-    private int speed; // Rychlost, jakou se trubka hýbe doleva.
-    private int topPipeHeight; // Výška horní trubky.
-    private Paint paint; // Barva trubky.
+    private final int screenHeight; // Výška obrazovky.
+    private final int width; // Šířka trubky.
+    private final int gap; // Velikost mezery, kterou ptáček prolétá.
+    private final int speed; // Rychlost, jakou se trubka hýbe doleva.
+    private final int topPipeHeight; // Výška horní trubky.
+    private final Paint paint; // Barva trubky.
+    private boolean isPassed = false; // Příznak, jestli už ptáček tuhle trubku proletěl.
 
     public Obstacle(int startX, int screenHeight) {
         this.x = startX; // Startovní pozice napravo.
         this.screenHeight = screenHeight;
         this.width = 150; // Šířka trubky.
         this.gap = 450;   // Mezera pro průlet.
-        this.speed = 10;  // Rychlost pohybu trubky.
+        this.speed = 10;  // Jak rychle se to na nás sype.
 
         paint = new Paint();
-        paint.setColor(Color.GREEN); // Nastavení barvy trubek na zelenou.
+        paint.setColor(Color.GREEN); // Trubky budou zelené jako v originálu.
 
-        // Pojištění, aby mezera byla vždy v hratelné výšce (ne u úplného okraje)
+        // Výpočet výšky horní trubky tak, aby mezera nebyla u kraje.
         int minHeight = 100;
         int maxHeight = screenHeight - gap - 100;
         this.topPipeHeight = (int) (Math.random() * (maxHeight - minHeight) + minHeight);
@@ -38,22 +39,25 @@ public class Obstacle {
         // Vykreslení horní trubky (odshora dolů k mezeře).
         canvas.drawRect(x, 0, x + width, topPipeHeight, paint);
         // Vykreslení spodní trubky (od konce mezery až dolů).
-        canvas.drawRect(x, topPipeHeight + gap, x + width, screenHeight, paint);
+        canvas.drawRect(x, (float) topPipeHeight + gap, x + width, screenHeight, paint);
     }
 
-    // Metoda pro detekci kolize
+    // Funkce pro zjištění, jestli do nás ptáček vrazil.
     public boolean isColliding(Bird bird) {
-        // Kontrola, zda je ptáček horizontálně v úrovni trubky
+        // Nejdřív zjistíme, jestli je ptáček mezi levou a pravou stranou trubky.
         if (bird.getX() + bird.getRadius() > x && bird.getX() - bird.getRadius() < x + width) {
-            // Kontrola kolize s horní nebo spodní trubkou
+            // Pak zkontrolujeme, jestli narazil do horní nebo spodní části.
             if (bird.getY() - bird.getRadius() < topPipeHeight || 
                 bird.getY() + bird.getRadius() > topPipeHeight + gap) {
-                return true;
+                return true; // Narazil!
             }
         }
-        return false;
+        return false; // Proletěl v pohodě.
     }
 
     public int getX() { return x; }
     public int getWidth() { return width; }
+
+    public boolean isPassed() { return isPassed; }
+    public void setPassed(boolean passed) { isPassed = passed; }
 }
