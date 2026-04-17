@@ -1,6 +1,7 @@
 package com.example.flappy_bird;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -29,6 +30,10 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     private final Paint textPaint; // Barva a styl textu v menu.
     private final Rect startButtonRect; // Oblast pro kliknutí ke startu.
 
+    private int score = 0; // Aktuální body v jedné hře.
+    private int highScore = 0; // Moje nejlepší skóre, co jsem kdy dal.
+    private final SharedPreferences prefs; // Tady si budeme ukládat High Score navždy.
+
     public GameView(Context context) {
         super(context);
         holder = getHolder();
@@ -36,11 +41,16 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         this.bird = new Bird(200, 500);
         this.obstacles = new ArrayList<>();
 
-        // Nastavení vzhledu textu pro menu.
+        // Načtení nejlepšího skóre z paměti mobilu.
+        prefs = context.getSharedPreferences("FlappyBirdPrefs", Context.MODE_PRIVATE);
+        highScore = prefs.getInt("highScore", 0);
+
+        // Nastavení vzhledu textu pro menu a skóre.
         textPaint = new Paint();
         textPaint.setColor(Color.WHITE);
         textPaint.setTextSize(100);
         textPaint.setTextAlign(Paint.Align.CENTER);
+        textPaint.setFakeBoldText(true); // Ať je to líp vidět.
         
         startButtonRect = new Rect();
     }
@@ -52,8 +62,6 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
                 update(); // Pohyby a kolize řešíme jen při hře.
             }
             draw(); // Kreslíme pořád.
-            
-            // Krátká pauza, aby hra neběžela moc rychle.
             try {
                 //noinspection BusyWait
                 Thread.sleep(16); // 60 FPS.
@@ -68,7 +76,7 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
 
         // Pokud ptáček vypadne z obrazovky, konec hry.
         if (bird.getY() + bird.getRadius() > screenHeight || bird.getY() - bird.getRadius() < 0) {
-            resetGame();
+            gameOver();
         }
 
         // Generování nových trubek.
@@ -85,8 +93,14 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             Obstacle obstacle = iterator.next();
             obstacle.moveToLeft();
 
+            // Pokud ptáček proletí za trubku, přičteme bod.
+            if (!obstacle.isPassed() && bird.getX() > obstacle.getX() + obstacle.getWidth()) {
+                score++;
+                obstacle.setPassed(true); // Už jsme bod dostali, tak ať se to neopakuje.
+            }
+
             if (obstacle.isColliding(bird)) {
-                resetGame(); // Narazil jsi, jdeš do menu.
+                gameOver(); // Náraz do trubky.
                 return;
             }
 
@@ -96,9 +110,18 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         }
     }
 
-    // Metoda pro reset hry a návrat zpět do menu.
-    private void resetGame() {
+    // Co se stane, když hráč prohraje.
+    private void gameOver() {
         isPlaying = false; // Hodíme hráče do menu.
+        
+        // Pokud jsme udělali rekord, uložíme ho.
+        if (score > highScore) {
+            highScore = score;
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putInt("highScore", highScore);
+            editor.apply();
+        }
+        
         bird.reset(screenHeight / 2); // Ptáček zpátky na střed.
         obstacles.clear(); // Vyčistit plochu od trubek.
     }
@@ -112,10 +135,14 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
                 if (!isPlaying) {
                     drawMenu(canvas); // Menu, když se nehraje.
                 } else {
+                    // Kreslení hry a aktuálního skóre nahoře.
                     bird.draw(canvas);
                     for (Obstacle obstacle : obstacles) {
                         obstacle.draw(canvas);
                     }
+                    
+                    textPaint.setTextSize(120);
+                    canvas.drawText(String.valueOf(score), (float) screenWidth / 2, 200, textPaint);
                 }
 
                 holder.unlockCanvasAndPost(canvas);
@@ -123,27 +150,31 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         }
     }
 
-    // Vykreslení úvodního menu.
+    // Vykreslení úvodního menu se statistikami.
     private void drawMenu(Canvas canvas) {
-        textPaint.setTextSize(150);
-        canvas.drawText("FLAPPY BIRD", (float) screenWidth / 2, (float) screenHeight / 3, textPaint);
+        textPaint.setTextSize(120);
+        canvas.drawText("FLAPPY BIRD", (float) screenWidth / 2, (float) screenHeight / 4, textPaint);
 
-        textPaint.setTextSize(80);
-        String startText = "TAP TO START";
-        canvas.drawText(startText, (float) screenWidth / 2, (float) screenHeight / 2, textPaint);
+        textPaint.setTextSize(70);
+        canvas.drawText("Last Score: " + score, (float) screenWidth / 2, (float) screenHeight / 2 - 100, textPaint);
+        canvas.drawText("Best Score: " + highScore, (float) screenWidth / 2, (float) screenHeight / 2, textPaint);
+
+        textPaint.setTextSize(90);
+        textPaint.setColor(Color.YELLOW);
+        canvas.drawText("TAP TO START", (float) screenWidth / 2, (float) screenHeight * 3 / 4, textPaint);
+        textPaint.setColor(Color.WHITE); // Vrátit barvu.
         
         // Kliknutí kdekoli uprostřed spustí hru.
-        startButtonRect.set(screenWidth/2 - 400, screenHeight/2 - 150, screenWidth/2 + 400, screenHeight/2 + 100);
+        startButtonRect.set(0, 0, screenWidth, screenHeight);
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
-            performClick(); // Kvůli přístupnosti.
+            performClick(); 
             if (!isPlaying) {
-                if (startButtonRect.contains((int)event.getX(), (int)event.getY())) {
-                    isPlaying = true;
-                }
+                score = 0; // Před startem hry vyvynulujeme skóre.
+                isPlaying = true;
             } else {
                 bird.jump();
             }
