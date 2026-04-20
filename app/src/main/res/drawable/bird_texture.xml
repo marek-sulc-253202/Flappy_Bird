@@ -1,0 +1,39 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Stín těla (středně zlatá) -->
+    <path
+        android:fillColor="#C69311"
+        android:pathData="M50,22 C32,22 17,37 17,57 C17,77 32,92 50,92 C68,92 83,77 83,57 C83,37 68,22 50,22 Z" />
+    <!-- Hlavní tělo (jasnější žlutá) -->
+    <path
+        android:fillColor="#F0D020"
+        android:pathData="M50,20 C30,20 15,35 15,55 C15,75 30,90 50,90 C70,90 85,75 85,55 C85,35 70,20 50,20 Z" />
+    <!-- Odlesk nahoře -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.25"
+        android:pathData="M35,35 C40,30 60,30 65,35" />
+    <!-- Oko bílá -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M65,35 C58,35 53,40 53,47 C53,54 58,59 65,59 C72,59 77,54 77,47 C77,40 72,35 65,35 Z" />
+    <!-- Panenka -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M68,43 C66,43 65,44 65,46 C65,48 66,49 68,49 C70,49 71,48 71,46 C71,44 70,43 68,43 Z" />
+    <!-- Zobák stín -->
+    <path
+        android:fillColor="#B85E1A"
+        android:pathData="M80,55 L98,62 L80,69 Z" />
+    <!-- Zobák hlavní -->
+    <path
+        android:fillColor="#E4811E"
+        android:pathData="M80,52 L95,60 L80,68 Z" />
+    <!-- Křídlo -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M35,55 C25,55 18,63 18,72 C18,81 25,89 35,89 C45,89 52,81 52,72 C52,63 45,55 35,55 Z" />
+</vector>

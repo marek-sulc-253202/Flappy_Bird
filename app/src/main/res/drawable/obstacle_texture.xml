@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="150dp"
+    android:height="500dp"
+    android:viewportWidth="150"
+    android:viewportHeight="500">
+    <!-- Hlavní tělo trubky (zelená) -->
+    <path
+        android:fillColor="#73BF2E"
+        android:pathData="M10,0 L140,0 L140,500 L10,500 Z" />
+    <!-- Levý stín (tmavší zelená) -->
+    <path
+        android:fillColor="#558022"
+        android:pathData="M10,0 L30,0 L30,500 L10,500 Z" />
+    <!-- Pravý odlesk (světlejší zelená) -->
+    <path
+        android:fillColor="#9DE64E"
+        android:pathData="M120,0 L135,0 L135,500 L120,500 Z" />
+    <!-- Ohraničení -->
+    <path
+        android:strokeColor="#543847"
+        android:strokeWidth="5"
+        android:pathData="M10,0 L10,500 M140,0 L140,500" />
+</vector>
