@@ -26,10 +26,14 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     private int screenWidth, screenHeight;
     
     private final Rect startButtonRect;
+    private final Rect arrowLeftRect = new Rect();
+    private final Rect arrowRightRect = new Rect();
+    
     private GameRenderer renderer;
 
     private int score = 0;
     private int highScore = 0;
+    private int skinIndex = 0; // Index vybraného skinu.
     private final SharedPreferences prefs;
 
     public GameView(Context context) {
@@ -41,6 +45,7 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
 
         prefs = context.getSharedPreferences("FlappyBirdPrefs", Context.MODE_PRIVATE);
         highScore = prefs.getInt("highScore", 0);
+        skinIndex = prefs.getInt("skinIndex", 0); // Načteme i uložený skin.
         
         startButtonRect = new Rect();
     }
@@ -118,9 +123,9 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
                 if (renderer != null) {
                     renderer.drawBackground(canvas);
                     if (!isPlaying) {
-                        renderer.drawMenu(canvas, score, highScore, startButtonRect);
+                        renderer.drawMenu(canvas, score, highScore, skinIndex, startButtonRect, arrowLeftRect, arrowRightRect);
                     } else {
-                        renderer.drawGame(canvas, bird, obstacles, score);
+                        renderer.drawGame(canvas, bird, obstacles, score, skinIndex);
                     }
                 }
                 holder.unlockCanvasAndPost(canvas);
@@ -132,8 +137,22 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     public boolean onTouchEvent(MotionEvent event) {
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
             performClick(); 
+            int x = (int) event.getX();
+            int y = (int) event.getY();
+
             if (!isPlaying) {
-                if (startButtonRect.contains((int)event.getX(), (int)event.getY())) {
+                // Přepínání skinů šipkami
+                if (arrowLeftRect.contains(x, y)) {
+                    skinIndex--;
+                    if (skinIndex < 0) skinIndex = renderer.getSkinsCount() - 1;
+                    saveSkin();
+                } else if (arrowRightRect.contains(x, y)) {
+                    skinIndex++;
+                    if (skinIndex >= renderer.getSkinsCount()) skinIndex = 0;
+                    saveSkin();
+                } 
+                // Start hry
+                else if (startButtonRect.contains(x, y)) {
                     score = 0;
                     isPlaying = true;
                 }
@@ -142,6 +161,12 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             }
         }
         return true;
+    }
+
+    private void saveSkin() {
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putInt("skinIndex", skinIndex);
+        editor.apply();
     }
 
     @Override
@@ -177,7 +202,6 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
         this.screenWidth = width;
         this.screenHeight = height;
-        // Předáváme Context pro načtení Drawable zdrojů.
         this.renderer = new GameRenderer(getContext(), width, height);
     }
 

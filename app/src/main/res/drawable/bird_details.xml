@@ -3,14 +3,6 @@
     android:height="100dp"
     android:viewportWidth="100"
     android:viewportHeight="100">
-    <!-- Stín těla (středně zlatá) -->
-    <path
-        android:fillColor="#C69311"
-        android:pathData="M50,22 C32,22 17,37 17,57 C17,77 32,92 50,92 C68,92 83,77 83,57 C83,37 68,22 50,22 Z" />
-    <!-- Hlavní tělo (jasnější žlutá) -->
-    <path
-        android:fillColor="#F0D020"
-        android:pathData="M50,20 C30,20 15,35 15,55 C15,75 30,90 50,90 C70,90 85,75 85,55 C85,35 70,20 50,20 Z" />
     <!-- Odlesk nahoře -->
     <path
         android:fillColor="#FFFFFF"

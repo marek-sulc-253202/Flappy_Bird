@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Hlavní maska těla pro barvení -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,20 C30,20 15,35 15,55 C15,75 30,90 50,90 C70,90 85,75 85,55 C85,35 70,20 50,20 Z" />
+</vector>
