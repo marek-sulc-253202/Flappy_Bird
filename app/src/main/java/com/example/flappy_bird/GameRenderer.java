@@ -47,6 +47,8 @@ public class GameRenderer {
     private final int colorBoard = Color.parseColor("#DED895"); // Barva tabulky se skóre.
     private final int colorBoardBorder = Color.parseColor("#543847"); // Barva okraje tabulky.
     private final int colorButton = Color.parseColor("#E89121"); // Barva tlačítka START.
+    private final int colorDiffSelected = Color.parseColor("#FFC107"); // Barva vybrané obtížnosti.
+    private final int colorDiffUnselected = Color.parseColor("#BDBDBD"); // Barva nevybrané obtížnosti.
 
     public GameRenderer(Context context, int screenWidth, int screenHeight) {
         this.screenWidth = screenWidth;
@@ -70,7 +72,7 @@ public class GameRenderer {
     private void initResources(Context context) {
         try {
             int birdSize = 120;
-            // 1a. Načtení masky těla (to co budeme barvit).
+            // Načtení masky těla (to co budeme barvit).
             Drawable bodyDrawable = ContextCompat.getDrawable(context, R.drawable.bird_body);
             if (bodyDrawable != null) {
                 birdBodyBitmap = Bitmap.createBitmap(birdSize, birdSize, Bitmap.Config.ARGB_8888);
@@ -79,7 +81,7 @@ public class GameRenderer {
                 bodyDrawable.draw(canvas);
             }
 
-            // 1b. Načtení detailů (oči, zobák), co zůstávají barevně stejné.
+            // Načtení detailů (oči, zobák), co zůstávají barevně stejné.
             Drawable detailsDrawable = ContextCompat.getDrawable(context, R.drawable.bird_details);
             if (detailsDrawable != null) {
                 birdDetailsBitmap = Bitmap.createBitmap(birdSize, birdSize, Bitmap.Config.ARGB_8888);
@@ -88,7 +90,7 @@ public class GameRenderer {
                 detailsDrawable.draw(canvas);
             }
 
-            // 2. Předkreslení celého pozadí (obloha a tráva) do jedné bitmapy.
+            // Předkreslení celého pozadí (obloha a tráva) do jedné bitmapy.
             backgroundBitmap = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888);
             Canvas bgCanvas = new Canvas(backgroundBitmap);
             bgCanvas.drawColor(Color.parseColor("#4EC0CA"));
@@ -97,7 +99,7 @@ public class GameRenderer {
             uiPaint.setColor(Color.parseColor("#DDE87C"));
             bgCanvas.drawRect(0, screenHeight - 100, screenWidth, screenHeight - 90, uiPaint);
 
-            // 3. Tělo trubky jako tenký vzorek, co se bleskově natáhne na celou výšku.
+            // Tělo trubky jako vzorek, co se bleskově natáhne na celou výšku.
             pipeBodyBitmap = Bitmap.createBitmap(150, 1, Bitmap.Config.ARGB_8888);
             Canvas bodyCanvas = new Canvas(pipeBodyBitmap);
             Paint p = new Paint();
@@ -108,7 +110,7 @@ public class GameRenderer {
             bodyCanvas.drawLine(0, 0, 0, 1, p);
             bodyCanvas.drawLine(149, 0, 149, 1, p);
 
-            // 4. Zakončení trubky (klobouček) do samostatné bitmapy.
+            // Klobouček trubky.
             int capW = 180;
             int capH = 50;
             pipeCapBitmap = Bitmap.createBitmap(capW, capH, Bitmap.Config.ARGB_8888);
@@ -126,14 +128,13 @@ public class GameRenderer {
         }
     }
 
-    // Vykreslení oblohy a země.
     public void drawBackground(Canvas canvas) {
         if (backgroundBitmap != null) {
             canvas.drawBitmap(backgroundBitmap, 0, 0, null);
         }
     }
 
-    // Metoda pro vykreslení ptáčka se správným skinem a rotací.
+    // Vykreslení ptáčka se správným skinem a rotací.
     private void drawBird(Canvas canvas, Bird bird, int skinIndex) {
         if (birdBodyBitmap != null && birdDetailsBitmap != null) {
             canvas.save();
@@ -196,32 +197,54 @@ public class GameRenderer {
         canvas.drawText(s, (float) screenWidth / 2, 250, textPaint);
     }
 
-    // Vykreslení menu s výběrem skinů a statistikami.
-    public void drawMenu(Canvas canvas, int score, int highScore, int skinIndex, Rect startButtonRect, Rect arrowLeftRect, Rect arrowRightRect) {
+    // Vykreslení menu s výběrem skinů, obtížnosti a statistikami.
+    public void drawMenu(Canvas canvas, int score, int highScore, int skinIndex, int difficulty,
+                         Rect startButtonRect, Rect arrowLeftRect, Rect arrowRightRect,
+                         Rect easyBtn, Rect normalBtn, Rect hardBtn) {
         float centerX = (float) screenWidth / 2;
 
-        // Nadpis hry.
-        textPaint.setTextSize(160);
+        // Nadpis hry - posunut níž a má stín.
+        textPaint.setTextSize(130);
         textPaint.setColor(Color.WHITE);
+        textPaint.setFakeBoldText(true);
+        textPaint.setShadowLayer(12, 6, 6, Color.BLACK);
         textPaint.setTextAlign(Paint.Align.CENTER);
-        canvas.drawText("FLAPPY BIRD", centerX, (float) screenHeight * 0.15f, textPaint);
+        canvas.drawText("FLAPPY BIRD", centerX, (float) screenHeight * 0.18f, textPaint);
+        textPaint.setShadowLayer(0, 0, 0, 0); // Vypnout stín pro ostatní prvky.
 
-        // Score board (tabulka se skóre).
-        rectFHelper.set(centerX - 300, (float) screenHeight * 0.25f, centerX + 300, (float) screenHeight * 0.45f);
+        // Score board (tabulka se skóre) - posunuta níž.
+        rectFHelper.set(centerX - 300, (float) screenHeight * 0.26f, centerX + 300, (float) screenHeight * 0.43f);
         uiPaint.setColor(colorBoard);
         canvas.drawRoundRect(rectFHelper, 30, 30, uiPaint);
         uiPaint.setColor(colorBoardBorder);
         uiPaint.setStyle(Paint.Style.STROKE);
+        uiPaint.setStrokeWidth(6); 
         canvas.drawRoundRect(rectFHelper, 30, 30, uiPaint);
         uiPaint.setStyle(Paint.Style.FILL);
 
         textPaint.setTextSize(60);
         textPaint.setColor(colorBoardBorder);
         canvas.drawText("SCORE: " + score, centerX, (float) screenHeight * 0.33f, textPaint);
-        canvas.drawText("BEST: " + highScore, centerX, (float) screenHeight * 0.4f, textPaint);
+        canvas.drawText("BEST: " + highScore, centerX, (float) screenHeight * 0.39f, textPaint);
 
-        // Sekce výběru skinu (ptáček a šipky).
-        float skinY = (float) screenHeight * 0.58f;
+        // --- VÝBĚR OBTÍŽNOSTI --- posunuto blíž ke skinům a níž.
+        float diffY = (float) screenHeight * 0.54f;
+        int btnW = 230; 
+        int btnH = 100; 
+        int spacing = 15;
+
+        easyBtn.set((int)centerX - btnW - btnW/2 - spacing, (int)diffY - btnH/2, (int)centerX - btnW/2 - spacing, (int)diffY + btnH/2);
+        normalBtn.set((int)centerX - btnW/2, (int)diffY - btnH/2, (int)centerX + btnW/2, (int)diffY + btnH/2);
+        hardBtn.set((int)centerX + btnW/2 + spacing, (int)diffY - btnH/2, (int)centerX + btnW + btnW/2 + spacing, (int)diffY + btnH/2);
+
+        drawDiffButton(canvas, easyBtn, "LEHKÁ", difficulty == 0);
+        drawDiffButton(canvas, normalBtn, "NORMAL", difficulty == 1);
+        drawDiffButton(canvas, hardBtn, "TĚŽKÁ", difficulty == 2);
+        
+        uiPaint.setStrokeWidth(1); // Reset tloušťky.
+
+        // Sekce výběru skinu (ptáček a šipky) - blíž k obtížnosti.
+        float skinY = (float) screenHeight * 0.68f;
         if (birdBodyBitmap != null && birdDetailsBitmap != null) {
             Paint skinPaint = new Paint();
             skinPaint.setColorFilter(new PorterDuffColorFilter(skinColors[skinIndex], PorterDuff.Mode.SRC_IN));
@@ -234,12 +257,11 @@ public class GameRenderer {
         canvas.drawText("<", centerX - 180, skinY + 30, textPaint);
         canvas.drawText(">", centerX + 180, skinY + 30, textPaint);
         
-        // Oblasti pro klikání na šipky.
         arrowLeftRect.set((int)centerX - 250, (int)skinY - 80, (int)centerX - 100, (int)skinY + 80);
         arrowRightRect.set((int)centerX + 100, (int)skinY - 80, (int)centerX + 250, (int)skinY + 80);
 
-        // Tlačítko START.
-        int bY = (int) (screenHeight * 0.75f);
+        // Tlačítko START - posunuto níž na závěr.
+        int bY = (int) (screenHeight * 0.82f);
         startButtonRect.set((int)centerX - 200, bY - 80, (int)centerX + 200, bY + 80);
         uiPaint.setColor(colorButton);
         canvas.drawRoundRect(new RectF(startButtonRect), 20, 20, uiPaint);
@@ -247,6 +269,22 @@ public class GameRenderer {
         textPaint.setColor(Color.WHITE);
         textPaint.setTextSize(80);
         canvas.drawText("START", centerX, bY + 30, textPaint);
+    }
+
+    // Pomocná metoda pro vykreslení tlačítka obtížnosti.
+    private void drawDiffButton(Canvas canvas, Rect rect, String label, boolean isSelected) {
+        uiPaint.setColor(isSelected ? colorDiffSelected : colorDiffUnselected);
+        canvas.drawRoundRect(new RectF(rect), 15, 15, uiPaint);
+        
+        uiPaint.setColor(colorBoardBorder);
+        uiPaint.setStyle(Paint.Style.STROKE);
+        uiPaint.setStrokeWidth(isSelected ? 6 : 2);
+        canvas.drawRoundRect(new RectF(rect), 15, 15, uiPaint);
+        uiPaint.setStyle(Paint.Style.FILL);
+
+        textPaint.setTextSize(38);
+        textPaint.setColor(isSelected ? colorBoardBorder : Color.DKGRAY);
+        canvas.drawText(label, rect.centerX(), rect.centerY() + 14, textPaint);
     }
     
     // Vrátí počet dostupných skinů.
