@@ -248,6 +248,8 @@ public class GameRenderer {
         if (birdBodyBitmap != null && birdDetailsBitmap != null) {
             Paint skinPaint = new Paint();
             skinPaint.setColorFilter(new PorterDuffColorFilter(skinColors[skinIndex], PorterDuff.Mode.SRC_IN));
+            
+            // Vrácena původní velikost náhledu v menu (120x120).
             canvas.drawBitmap(birdBodyBitmap, centerX - 60, skinY - 60, skinPaint);
             canvas.drawBitmap(birdDetailsBitmap, centerX - 60, skinY - 60, null);
         }
