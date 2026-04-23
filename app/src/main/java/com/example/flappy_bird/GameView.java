@@ -101,7 +101,15 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             // Vzdálenost trubek se mění podle obtížnosti.
             int obstacleDistance = (difficulty == 0) ? 1000 : (difficulty == 2 ? 650 : 800);
             if (obstacles.isEmpty() || obstacles.get(obstacles.size() - 1).getX() < screenWidth - obstacleDistance) {
-                obstacles.add(new Obstacle(screenWidth, screenHeight - 100, currentSpeed));
+                
+                // Zjistíme výšku poslední trubky, abychom na ni mohli navázat.
+                int lastHeight = -1;
+                if (!obstacles.isEmpty()) {
+                    lastHeight = obstacles.get(obstacles.size() - 1).getTopPipeHeight();
+                }
+                
+                // Přidání nové trubky s informací o té minulé.
+                obstacles.add(new Obstacle(screenWidth, screenHeight - 100, currentSpeed, lastHeight));
             }
         }
 

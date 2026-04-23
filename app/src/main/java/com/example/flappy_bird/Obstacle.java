@@ -15,7 +15,7 @@ public class Obstacle {
     private final Paint capPaint; // Barva pro zakončení trubky.
     private boolean isPassed = false; // Už jsme proletěli?
 
-    public Obstacle(int startX, int screenHeight, int speed) {
+    public Obstacle(int startX, int screenHeight, int speed, int lastPipeHeight) {
         this.x = startX;
         this.screenHeight = screenHeight;
         this.width = 150;
@@ -31,15 +31,27 @@ public class Obstacle {
 
         int minHeight = 150; 
         int maxHeight = screenHeight - gap - 150; 
-        this.topPipeHeight = (int) (Math.random() * (maxHeight - minHeight) + minHeight);
+
+        if (lastPipeHeight == -1) {
+            // První trubka - úplně náhodná výška.
+            this.topPipeHeight = (int) (Math.random() * (maxHeight - minHeight) + minHeight);
+        } else {
+            // Další trubky - omezení rozdílu oproti té minulé.
+            int maxShift = 500; // Maximálně o kolik pixelů může být další mezera výš nebo níž.
+            int preferredHeight = lastPipeHeight + (int) (Math.random() * (maxShift * 2) - maxShift);
+            
+            // Pojistka, aby mezera nevyjela z hratelné plochy.
+            if (preferredHeight < minHeight) preferredHeight = minHeight;
+            if (preferredHeight > maxHeight) preferredHeight = maxHeight;
+            
+            this.topPipeHeight = preferredHeight;
+        }
     }
 
     public void moveToLeft() {
         x -= speed;
     }
 
-    // Tuto metodu už v podstatě nepotřebujeme, protože kreslí Renderer,
-    // ale necháme ji tu pro jistotu jako fallback.
     public void draw(Canvas canvas) {
         canvas.drawRect(x, 0, x + width, topPipeHeight, paint);
         canvas.drawRect(x, (float) topPipeHeight + gap, x + width, screenHeight, paint);
@@ -55,7 +67,6 @@ public class Obstacle {
         return false;
     }
 
-    // Gettery, které Renderer potřebuje:
     public int getX() { return x; }
     public int getWidth() { return width; }
     public int getTopPipeHeight() { return topPipeHeight; }
