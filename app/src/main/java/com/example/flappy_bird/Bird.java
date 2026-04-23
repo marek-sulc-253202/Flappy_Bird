@@ -17,9 +17,9 @@ public class Bird {
         this.x = startX;
         this.y = startY;
         this.velocity = 0;
-        this.radius = 50;
-        this.gravity = 2; // Vráceno na původní hodnotu.
-        this.jumpPower = -30; // Vráceno na původní hodnotu.
+        this.radius = 60;
+        this.gravity = 2;
+        this.jumpPower = -30;
 
         paint = new Paint();
         paint.setColor(Color.RED);
@@ -31,6 +31,7 @@ public class Bird {
     }
 
     public void draw(Canvas canvas) {
+        // Renderer teď používá bitmapu, ale necháme tu kruh pro jistotu.
         canvas.drawCircle((float) x, (float) y, (float) radius, paint);
     }
 
@@ -41,6 +42,7 @@ public class Bird {
     public int getX() { return x; }
     public int getY() { return y; }
     public int getRadius() { return radius; }
+    public int getVelocity() { return velocity; } // Getter pro rotaci v rendereru.
     
     public void reset(int startY) {
         this.y = startY;

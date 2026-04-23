@@ -62,7 +62,7 @@ public class GameRenderer {
             // 1. Ptáček do bitmapy
             Drawable birdDrawable = ContextCompat.getDrawable(context, R.drawable.bird_texture);
             if (birdDrawable != null) {
-                int size = 100;
+                int size = 120; // Radius 60 * 2 (zvětšeno 1.2x)
                 birdBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
                 Canvas canvas = new Canvas(birdBitmap);
                 birdDrawable.setBounds(0, 0, size, size);
@@ -136,9 +136,20 @@ public class GameRenderer {
             }
         }
 
-        // Ptáček z bitmapy
+        // --- Vykreslení ptáčka s rotací ---
         if (birdBitmap != null) {
+            canvas.save();
+            // Výpočet úhlu na základě rychlosti (velocity).
+            // -30 (skok) -> cca -20 stupňů (míří nahoru).
+            // +20 (pád) -> cca 65 stupňů (padá dolů).
+            float velocity = bird.getVelocity();
+            float angle = velocity * 3.0f; // Koeficient pro citlivost rotace.
+            if (angle > 65) angle = 65; // Maximální náklon dolů.
+            if (angle < -20) angle = -20; // Maximální náklon nahoru.
+
+            canvas.rotate(angle, (float) bird.getX(), (float) bird.getY());
             canvas.drawBitmap(birdBitmap, bird.getX() - bird.getRadius(), bird.getY() - bird.getRadius(), null);
+            canvas.restore();
         }
 
         // Skóre z cache (žádná alokace paměti)
