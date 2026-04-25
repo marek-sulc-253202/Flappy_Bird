@@ -4,14 +4,12 @@ plugins {
 
 android {
     namespace = "com.example.flappy_bird"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36 // Zvýšeno na 36 dle požadavku knihovny activity
 
     defaultConfig {
         applicationId = "com.example.flappy_bird"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 36 // Zvýšeno na 36
         versionCode = 1
         versionName = "1.0"
 
@@ -38,6 +36,12 @@ dependencies {
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
+    
+    // Retrofit pro síťovou komunikaci
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+    implementation(libs.gson)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

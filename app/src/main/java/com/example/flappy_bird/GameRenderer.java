@@ -28,7 +28,6 @@ public class GameRenderer {
     private Bitmap pipeCapBitmap;
     private Bitmap pipeBodyBitmap;
     
-    // Ikonky pro zvuk
     private final Drawable soundOnDrawable;
     private final Drawable soundOffDrawable;
 
@@ -62,7 +61,6 @@ public class GameRenderer {
         uiPaint = new Paint();
         uiPaint.setAntiAlias(true);
         
-        // Načtení ikon zvuku
         soundOnDrawable = ContextCompat.getDrawable(context, R.drawable.ic_sound_on);
         soundOffDrawable = ContextCompat.getDrawable(context, R.drawable.ic_sound_off);
 
@@ -123,7 +121,7 @@ public class GameRenderer {
             uiPaint.setStyle(Paint.Style.FILL);
 
         } catch (Exception e) {
-            Log.e("GameRenderer", "Chyba při inicializaci grafiky", e);
+            Log.e("GameRenderer", "Chyba při inicializaci", e);
         }
     }
 
@@ -154,18 +152,6 @@ public class GameRenderer {
         }
     }
 
-    // Metoda pro vykreslení ikonky zvuku v rohu
-    public void drawSoundButton(Canvas canvas, boolean isMuted, Rect soundBtn) {
-        // Nastavení oblasti pro ikonu (levý horní roh)
-        soundBtn.set(50, 50, 150, 150);
-        
-        Drawable icon = isMuted ? soundOffDrawable : soundOnDrawable;
-        if (icon != null) {
-            icon.setBounds(soundBtn);
-            icon.draw(canvas);
-        }
-    }
-
     public void drawGame(Canvas canvas, Bird bird, List<Obstacle> obstacles, int score, int skinIndex, boolean isMuted, Rect soundBtn) {
         for (int i = 0; i < obstacles.size(); i++) {
             Obstacle obstacle = obstacles.get(i);
@@ -189,8 +175,10 @@ public class GameRenderer {
 
         drawBird(canvas, bird, skinIndex);
         
-        // Vykreslení ikony zvuku i během hry
-        drawSoundButton(canvas, isMuted, soundBtn);
+        // Zvuk v rohu i při hře
+        soundBtn.set(50, 50, 150, 150);
+        Drawable icon = isMuted ? soundOffDrawable : soundOnDrawable;
+        if (icon != null) { icon.setBounds(soundBtn); icon.draw(canvas); }
 
         textPaint.setColor(Color.WHITE);
         textPaint.setTextSize(140);
@@ -201,10 +189,13 @@ public class GameRenderer {
     }
 
     public void drawMenu(Canvas canvas, int score, int highScore, int skinIndex, int difficulty, boolean isMuted,
+                         String playerName, boolean isOnline,
                          Rect startButtonRect, Rect arrowLeftRect, Rect arrowRightRect,
-                         Rect easyBtn, Rect normalBtn, Rect hardBtn, Rect soundBtn) {
+                         Rect easyBtn, Rect normalBtn, Rect hardBtn, Rect soundBtn,
+                         Rect addBtn, Rect deleteBtn) {
         float centerX = (float) screenWidth / 2;
 
+        // Nadpis
         textPaint.setTextSize(130);
         textPaint.setColor(Color.WHITE);
         textPaint.setFakeBoldText(true);
@@ -213,7 +204,8 @@ public class GameRenderer {
         canvas.drawText("FLAPPY BIRD", centerX, (float) screenHeight * 0.18f, textPaint);
         textPaint.setShadowLayer(0, 0, 0, 0); 
 
-        rectFHelper.set(centerX - 300, (float) screenHeight * 0.26f, centerX + 300, (float) screenHeight * 0.43f);
+        // Score board
+        rectFHelper.set(centerX - 350, (float) screenHeight * 0.24f, centerX + 350, (float) screenHeight * 0.44f);
         uiPaint.setColor(colorBoard);
         canvas.drawRoundRect(rectFHelper, 30, 30, uiPaint);
         uiPaint.setColor(colorBoardBorder);
@@ -222,26 +214,44 @@ public class GameRenderer {
         canvas.drawRoundRect(rectFHelper, 30, 30, uiPaint);
         uiPaint.setStyle(Paint.Style.FILL);
 
+        // Hráč a šipky (jen online)
+        textPaint.setTextSize(50);
+        textPaint.setColor(isOnline ? Color.BLUE : Color.RED);
+        canvas.drawText(playerName, centerX, (float) screenHeight * 0.29f, textPaint);
+        
+        if (isOnline) {
+            textPaint.setTextSize(80);
+            textPaint.setColor(colorBoardBorder);
+            canvas.drawText("<", centerX - 280, (float) screenHeight * 0.30f, textPaint);
+            canvas.drawText(">", centerX + 280, (float) screenHeight * 0.30f, textPaint);
+            arrowLeftRect.set((int)centerX - 350, (int)(screenHeight * 0.25f), (int)centerX - 200, (int)(screenHeight * 0.35f));
+            arrowRightRect.set((int)centerX + 200, (int)(screenHeight * 0.25f), (int)centerX + 350, (int)(screenHeight * 0.35f));
+            
+            // Tlačítka + a - pro hráče
+            addBtn.set((int)centerX + 250, (int)(screenHeight * 0.40f), (int)centerX + 330, (int)(screenHeight * 0.45f));
+            deleteBtn.set((int)centerX - 330, (int)(screenHeight * 0.40f), (int)centerX - 250, (int)(screenHeight * 0.45f));
+            textPaint.setTextSize(40);
+            canvas.drawText("+ NEW", centerX + 220, (float) screenHeight * 0.43f, textPaint);
+            canvas.drawText("DEL -", centerX - 220, (float) screenHeight * 0.43f, textPaint);
+        }
+
         textPaint.setTextSize(60);
         textPaint.setColor(colorBoardBorder);
-        canvas.drawText("SCORE: " + score, centerX, (float) screenHeight * 0.33f, textPaint);
-        canvas.drawText("BEST: " + highScore, centerX, (float) screenHeight * 0.39f, textPaint);
+        canvas.drawText("SCORE: " + score, centerX, (float) screenHeight * 0.34f, textPaint);
+        canvas.drawText("BEST: " + highScore, centerX, (float) screenHeight * 0.40f, textPaint);
 
+        // Obtížnost
         float diffY = (float) screenHeight * 0.54f;
-        int btnW = 230; 
-        int btnH = 100; 
-        int spacing = 15;
-
+        int btnW = 230; int btnH = 100; int spacing = 15;
         easyBtn.set((int)centerX - btnW - btnW/2 - spacing, (int)diffY - btnH/2, (int)centerX - btnW/2 - spacing, (int)diffY + btnH/2);
         normalBtn.set((int)centerX - btnW/2, (int)diffY - btnH/2, (int)centerX + btnW/2, (int)diffY + btnH/2);
         hardBtn.set((int)centerX + btnW/2 + spacing, (int)diffY - btnH/2, (int)centerX + btnW + btnW/2 + spacing, (int)diffY + btnH/2);
-
         drawDiffButton(canvas, easyBtn, "LEHKÁ", difficulty == 0);
         drawDiffButton(canvas, normalBtn, "NORMAL", difficulty == 1);
         drawDiffButton(canvas, hardBtn, "TĚŽKÁ", difficulty == 2);
-        
         uiPaint.setStrokeWidth(1); 
 
+        // Skiny
         float skinY = (float) screenHeight * 0.68f;
         if (birdBodyBitmap != null && birdDetailsBitmap != null) {
             Paint skinPaint = new Paint();
@@ -250,25 +260,18 @@ public class GameRenderer {
             canvas.drawBitmap(birdDetailsBitmap, centerX - 60, skinY - 60, null);
         }
 
-        textPaint.setTextSize(100);
-        textPaint.setColor(Color.WHITE);
-        canvas.drawText("<", centerX - 180, skinY + 30, textPaint);
-        canvas.drawText(">", centerX + 180, skinY + 30, textPaint);
-        
-        arrowLeftRect.set((int)centerX - 250, (int)skinY - 80, (int)centerX - 100, (int)skinY + 80);
-        arrowRightRect.set((int)centerX + 100, (int)skinY - 80, (int)centerX + 250, (int)skinY + 80);
-
-        // Vykreslení ikony zvuku i v menu
-        drawSoundButton(canvas, isMuted, soundBtn);
-
+        // Tlačítko START
         int bY = (int) (screenHeight * 0.88f);
         startButtonRect.set((int)centerX - 200, bY - 80, (int)centerX + 200, bY + 80);
         uiPaint.setColor(colorButton);
         canvas.drawRoundRect(new RectF(startButtonRect), 20, 20, uiPaint);
-
-        textPaint.setColor(Color.WHITE);
-        textPaint.setTextSize(80);
+        textPaint.setColor(Color.WHITE); textPaint.setTextSize(80);
         canvas.drawText("START", centerX, bY + 30, textPaint);
+
+        // Zvuk
+        soundBtn.set(50, 50, 150, 150);
+        Drawable icon = isMuted ? soundOffDrawable : soundOnDrawable;
+        if (icon != null) { icon.setBounds(soundBtn); icon.draw(canvas); }
     }
 
     private void drawDiffButton(Canvas canvas, Rect rect, String label, boolean isSelected) {
@@ -276,7 +279,7 @@ public class GameRenderer {
         canvas.drawRoundRect(new RectF(rect), 15, 15, uiPaint);
         uiPaint.setColor(colorBoardBorder);
         uiPaint.setStyle(Paint.Style.STROKE);
-        uiPaint.setStrokeWidth(6);
+        uiPaint.setStrokeWidth(isSelected ? 6 : 2); 
         canvas.drawRoundRect(new RectF(rect), 15, 15, uiPaint);
         uiPaint.setStyle(Paint.Style.FILL);
         textPaint.setTextSize(38);
@@ -284,7 +287,5 @@ public class GameRenderer {
         canvas.drawText(label, rect.centerX(), rect.centerY() + 14, textPaint);
     }
     
-    public int getSkinsCount() {
-        return skinColors.length;
-    }
+    public int getSkinsCount() { return skinColors.length; }
 }

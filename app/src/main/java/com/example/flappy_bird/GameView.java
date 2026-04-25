@@ -8,32 +8,39 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-
+import android.widget.EditText;
+import androidx.appcompat.app.AlertDialog;
 import androidx.annotation.NonNull;
-
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Callback {
 
-    private Thread thread; 
-    private boolean isRunning; 
-    private boolean isPlaying = false; 
-    private boolean isDying = false; 
+    private Thread thread;
+    private boolean isRunning;
+    private boolean isPlaying = false;
+    private boolean isDying = false;
     
     private final SurfaceHolder holder;
     private final Bird bird;
     private final List<Obstacle> obstacles;
     private int screenWidth, screenHeight; 
     
-    private final Rect startButtonRect;
+    private final Rect startButtonRect = new Rect();
     private final Rect arrowLeftRect = new Rect();
     private final Rect arrowRightRect = new Rect();
     private final Rect easyBtnRect = new Rect();
     private final Rect normalBtnRect = new Rect();
     private final Rect hardBtnRect = new Rect();
-    private final Rect soundBtnRect = new Rect(); // Rect pro ikonku v rohu.
+    private final Rect soundBtnRect = new Rect();
+    
+    // Nové Recty pro správu hráčů na serveru.
+    private final Rect addPlayerBtnRect = new Rect();
+    private final Rect deletePlayerBtnRect = new Rect();
     
     private GameRenderer renderer;
     private final SoundManager soundManager;
@@ -44,6 +51,11 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     private int difficulty = 1; 
     private final SharedPreferences prefs;
 
+    // --- ONLINE LOGIKA ---
+    private List<NetworkManager.PlayerModel> onlinePlayers = new ArrayList<>();
+    private int currentPlayerIndex = -1;
+    private boolean isOnline = false;
+
     public GameView(Context context) {
         super(context);
         holder = getHolder();
@@ -53,16 +65,49 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         this.soundManager = new SoundManager(context);
 
         prefs = context.getSharedPreferences("FlappyBirdPrefs", Context.MODE_PRIVATE);
+        loadLocalData();
         
+        // Při startu zkusíme server.
+        refreshPlayersFromServer();
+    }
+
+    private void loadLocalData() {
         highScores[0] = prefs.getInt("highScore_0", 0);
         highScores[1] = prefs.getInt("highScore_1", 0);
         highScores[2] = prefs.getInt("highScore_2", 0);
-        
         skinIndex = prefs.getInt("skinIndex", 0);
         difficulty = prefs.getInt("difficulty", 1); 
         soundManager.setMuted(prefs.getBoolean("isMuted", false));
-        
-        startButtonRect = new Rect();
+    }
+
+    // Funkce, která zkusí stáhnout hráče ze serveru.
+    private void refreshPlayersFromServer() {
+        NetworkManager.getApi().getPlayers().enqueue(new Callback<List<NetworkManager.PlayerModel>>() {
+            @Override
+            public void onResponse(Call<List<NetworkManager.PlayerModel>> call, Response<List<NetworkManager.PlayerModel>> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    onlinePlayers = response.body();
+                    isOnline = true;
+                    if (currentPlayerIndex == -1 && !onlinePlayers.isEmpty()) currentPlayerIndex = 0;
+                    updateScoresFromCurrentPlayer();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<List<NetworkManager.PlayerModel>> call, Throwable t) {
+                isOnline = false; // Server nejede -> jsme offline.
+                Log.e("GameView", "Server offline: " + t.getMessage());
+            }
+        });
+    }
+
+    private void updateScoresFromCurrentPlayer() {
+        if (isOnline && currentPlayerIndex >= 0 && currentPlayerIndex < onlinePlayers.size()) {
+            NetworkManager.PlayerModel p = onlinePlayers.get(currentPlayerIndex);
+            highScores[0] = p.score_easy;
+            highScores[1] = p.score_normal;
+            highScores[2] = p.score_hard;
+        }
     }
 
     @Override
@@ -88,10 +133,8 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             handleGameOver();
         }
 
-        int baseSpeed = 10;
-        int speedStep = 10;
-        if (difficulty == 0) { baseSpeed = 7; speedStep = 15; } 
-        if (difficulty == 2) { baseSpeed = 14; speedStep = 7; }
+        int baseSpeed = (difficulty == 0) ? 7 : (difficulty == 2 ? 14 : 10);
+        int speedStep = (difficulty == 0) ? 15 : (difficulty == 2 ? 7 : 10);
 
         int currentSpeed = baseSpeed + (score / speedStep);
         if (currentSpeed > 30) currentSpeed = 30;
@@ -100,9 +143,7 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             int obstacleDistance = (difficulty == 0) ? 1000 : (difficulty == 2 ? 650 : 800);
             if (obstacles.isEmpty() || obstacles.get(obstacles.size() - 1).getX() < screenWidth - obstacleDistance) {
                 int lastHeight = -1;
-                if (!obstacles.isEmpty()) {
-                    lastHeight = obstacles.get(obstacles.size() - 1).getTopPipeHeight();
-                }
+                if (!obstacles.isEmpty()) lastHeight = obstacles.get(obstacles.size() - 1).getTopPipeHeight();
                 obstacles.add(new Obstacle(screenWidth, screenHeight - 100, currentSpeed, lastHeight));
             }
         }
@@ -123,9 +164,7 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
                 return;
             }
 
-            if (obstacle.getX() + obstacle.getWidth() < 0) {
-                iterator.remove();
-            }
+            if (obstacle.getX() + obstacle.getWidth() < 0) iterator.remove();
         }
     }
 
@@ -135,11 +174,7 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         soundManager.playHit(); 
 
         new Thread(() -> {
-            try {
-                Thread.sleep(600); 
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            try { Thread.sleep(600); } catch (InterruptedException e) {}
             post(() -> {
                 gameOver();
                 isDying = false; 
@@ -149,15 +184,32 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
 
     private void gameOver() {
         isPlaying = false;
+        // Pokud jsme online, pošleme rekord na server.
         if (score > highScores[difficulty]) {
             highScores[difficulty] = score;
-            saveHighScore();
+            if (isOnline && currentPlayerIndex != -1) {
+                sendScoreToServer();
+            } else {
+                saveLocalHighScore();
+            }
         }
         bird.reset(screenHeight / 2);
         obstacles.clear();
     }
 
-    private void saveHighScore() {
+    private void sendScoreToServer() {
+        String name = onlinePlayers.get(currentPlayerIndex).name;
+        NetworkManager.getApi().updateScore(new NetworkManager.ScoreUpdateModel(name, difficulty, score)).enqueue(new Callback<Void>() {
+            @Override
+            public void onResponse(Call<Void> call, Response<Void> response) {
+                refreshPlayersFromServer(); // Aktualizujeme data.
+            }
+            @Override
+            public void onFailure(Call<Void> call, Throwable t) {}
+        });
+    }
+
+    private void saveLocalHighScore() {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putInt("highScore_" + difficulty, highScores[difficulty]);
         editor.apply();
@@ -170,11 +222,12 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
                 if (renderer != null) {
                     renderer.drawBackground(canvas);
                     if (!isPlaying) {
+                        String playerName = (isOnline && currentPlayerIndex != -1) ? onlinePlayers.get(currentPlayerIndex).name : "OFFLINE";
                         renderer.drawMenu(canvas, score, highScores[difficulty], skinIndex, difficulty, 
-                                        soundManager.isMuted(), startButtonRect, arrowLeftRect, arrowRightRect,
-                                        easyBtnRect, normalBtnRect, hardBtnRect, soundBtnRect);
+                                        soundManager.isMuted(), playerName, isOnline, startButtonRect, arrowLeftRect, arrowRightRect,
+                                        easyBtnRect, normalBtnRect, hardBtnRect, soundBtnRect,
+                                        addPlayerBtnRect, deletePlayerBtnRect);
                     } else {
-                        // Přidáváme isMuted a soundBtnRect i pro hru.
                         renderer.drawGame(canvas, bird, obstacles, score, skinIndex, soundManager.isMuted(), soundBtnRect);
                     }
                 }
@@ -190,28 +243,35 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             int x = (int) event.getX();
             int y = (int) event.getY();
 
-            // Kliknutí na zvuk funguje v menu i během hry.
             if (soundBtnRect.contains(x, y)) {
                 soundManager.toggleMute();
                 saveMuteState();
-                return true; // Událost zpracována.
+                return true;
             }
 
             if (!isPlaying) {
-                if (easyBtnRect.contains(x, y)) { difficulty = 0; score = 0; saveDifficulty(); }
-                else if (normalBtnRect.contains(x, y)) { difficulty = 1; score = 0; saveDifficulty(); }
-                else if (hardBtnRect.contains(x, y)) { difficulty = 2; score = 0; saveDifficulty(); }
-                else if (arrowLeftRect.contains(x, y)) {
-                    skinIndex = (skinIndex - 1 + renderer.getSkinsCount()) % renderer.getSkinsCount();
-                    saveSkin();
-                } else if (arrowRightRect.contains(x, y)) {
-                    skinIndex = (skinIndex + 1) % renderer.getSkinsCount();
-                    saveSkin();
-                } 
-                else if (startButtonRect.contains(x, y)) {
-                    score = 0;
-                    isPlaying = true;
+                // Přepínání hráčů (online).
+                if (isOnline && !onlinePlayers.isEmpty()) {
+                    if (arrowLeftRect.contains(x, y)) {
+                        currentPlayerIndex = (currentPlayerIndex - 1 + onlinePlayers.size()) % onlinePlayers.size();
+                        updateScoresFromCurrentPlayer();
+                        score = 0;
+                    } else if (arrowRightRect.contains(x, y)) {
+                        currentPlayerIndex = (currentPlayerIndex + 1) % onlinePlayers.size();
+                        updateScoresFromCurrentPlayer();
+                        score = 0;
+                    }
                 }
+                
+                // Přidání / Smazání hráče.
+                if (isOnline && addPlayerBtnRect.contains(x, y)) showAddPlayerDialog();
+                if (isOnline && deletePlayerBtnRect.contains(x, y)) deleteCurrentPlayer();
+
+                // Ostatní nastavení.
+                if (easyBtnRect.contains(x, y)) { difficulty = 0; score = 0; updateScoresFromCurrentPlayer(); saveDifficulty(); }
+                else if (normalBtnRect.contains(x, y)) { difficulty = 1; score = 0; updateScoresFromCurrentPlayer(); saveDifficulty(); }
+                else if (hardBtnRect.contains(x, y)) { difficulty = 2; score = 0; saveDifficulty(); }
+                else if (startButtonRect.contains(x, y)) { score = 0; isPlaying = true; }
             } else if (!isDying) {
                 bird.jump();
                 soundManager.playJump();
@@ -220,10 +280,34 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         return true;
     }
 
-    private void saveSkin() {
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putInt("skinIndex", skinIndex);
-        editor.apply();
+    private void showAddPlayerDialog() {
+        // Tady využijeme standardní Android dialog pro zadání jména.
+        EditText input = new EditText(getContext());
+        new AlertDialog.Builder(getContext())
+            .setTitle("Nový hráč")
+            .setMessage("Zadej jméno:")
+            .setView(input)
+            .setPositiveButton("OK", (dialog, which) -> {
+                String name = input.getText().toString();
+                if (!name.isEmpty()) {
+                    NetworkManager.getApi().addPlayer(new NetworkManager.PlayerModel(name)).enqueue(new Callback<Void>() {
+                        @Override public void onResponse(Call<Void> call, Response<Void> response) { refreshPlayersFromServer(); }
+                        @Override public void onFailure(Call<Void> call, Throwable t) {}
+                    });
+                }
+            })
+            .setNegativeButton("Zrušit", null)
+            .show();
+    }
+
+    private void deleteCurrentPlayer() {
+        if (currentPlayerIndex != -1) {
+            String name = onlinePlayers.get(currentPlayerIndex).name;
+            NetworkManager.getApi().deletePlayer(new NetworkManager.PlayerModel(name)).enqueue(new Callback<Void>() {
+                @Override public void onResponse(Call<Void> call, Response<Void> response) { refreshPlayersFromServer(); }
+                @Override public void onFailure(Call<Void> call, Throwable t) {}
+            });
+        }
     }
 
     private void saveDifficulty() {
@@ -238,34 +322,19 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         editor.apply();
     }
 
-    @Override
-    public boolean performClick() {
-        return super.performClick();
+    private void saveSkin() { // Pro skiny (zůstalo lokální pro jednoduchost).
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putInt("skinIndex", skinIndex);
+        editor.apply();
     }
 
-    public void resume() {
-        isRunning = true;
-        if (holder.getSurface().isValid()) {
-            thread = new Thread(this);
-            thread.start();
-        }
+    @Override public boolean performClick() { return super.performClick(); }
+    public void resume() { isRunning = true; if (holder.getSurface().isValid()) { thread = new Thread(this); thread.start(); } }
+    public void pause() { isRunning = false; try { if (thread != null) thread.join(); } catch (Exception e) {} }
+    @Override public void surfaceCreated(@NonNull SurfaceHolder h) { resume(); }
+    @Override public void surfaceChanged(@NonNull SurfaceHolder h, int f, int w, int h1) {
+        this.screenWidth = w; this.screenHeight = h1;
+        this.renderer = new GameRenderer(getContext(), w, h1);
     }
-
-    public void pause() {
-        isRunning = false;
-        try { if (thread != null) thread.join(); } catch (InterruptedException e) { Log.e("GameView", "Join error", e); }
-    }
-
-    @Override
-    public void surfaceCreated(@NonNull SurfaceHolder holder) { resume(); }
-
-    @Override
-    public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
-        this.screenWidth = width;
-        this.screenHeight = height;
-        this.renderer = new GameRenderer(getContext(), width, height);
-    }
-
-    @Override
-    public void surfaceDestroyed(@NonNull SurfaceHolder holder) { pause(); }
+    @Override public void surfaceDestroyed(@NonNull SurfaceHolder h) { pause(); }
 }
