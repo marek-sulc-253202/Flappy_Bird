@@ -17,29 +17,31 @@ import java.util.List;
 
 public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Callback {
 
-    private Thread thread; // Vlákno pro herní smyčku.
-    private boolean isRunning; // Jestli vlákno běží.
-    private boolean isPlaying = false; // Jestli se zrovna hraje.
+    private Thread thread; 
+    private boolean isRunning; 
+    private boolean isPlaying = false; 
+    private boolean isDying = false; 
+    
     private final SurfaceHolder holder;
     private final Bird bird;
     private final List<Obstacle> obstacles;
-    private int screenWidth, screenHeight; // Rozměry displeje.
+    private int screenWidth, screenHeight; 
     
     private final Rect startButtonRect;
     private final Rect arrowLeftRect = new Rect();
     private final Rect arrowRightRect = new Rect();
-    
-    // Tlačítka pro obtížnost.
     private final Rect easyBtnRect = new Rect();
     private final Rect normalBtnRect = new Rect();
     private final Rect hardBtnRect = new Rect();
+    private final Rect soundBtnRect = new Rect(); // Rect pro ikonku v rohu.
     
     private GameRenderer renderer;
+    private final SoundManager soundManager;
 
-    private int score = 0; // Aktuální body.
-    private final int[] highScores = new int[3]; // Rekordy pro 3 obtížnosti.
-    private int skinIndex = 0; // Vybraný skin.
-    private int difficulty = 1; // 0: LEHKÁ, 1: NORMAL, 2: TĚŽKÁ.
+    private int score = 0; 
+    private final int[] highScores = new int[3]; 
+    private int skinIndex = 0; 
+    private int difficulty = 1; 
     private final SharedPreferences prefs;
 
     public GameView(Context context) {
@@ -48,31 +50,31 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         holder.addCallback(this);
         this.bird = new Bird(200, 500);
         this.obstacles = new ArrayList<>();
+        this.soundManager = new SoundManager(context);
 
         prefs = context.getSharedPreferences("FlappyBirdPrefs", Context.MODE_PRIVATE);
         
-        // Načtení rekordů pro všechny obtížnosti.
         highScores[0] = prefs.getInt("highScore_0", 0);
         highScores[1] = prefs.getInt("highScore_1", 0);
         highScores[2] = prefs.getInt("highScore_2", 0);
         
         skinIndex = prefs.getInt("skinIndex", 0);
         difficulty = prefs.getInt("difficulty", 1); 
+        soundManager.setMuted(prefs.getBoolean("isMuted", false));
         
         startButtonRect = new Rect();
     }
 
     @Override
     public void run() {
-        // Smyčka běží pořád dokola, dokud je isRunning true.
         while(isRunning) {
-            if (isPlaying) {
-                update(); // Výpočty jen při hře.
+            if (isPlaying && !isDying) {
+                update(); 
             }
-            draw(); // Kreslíme vždycky (menu nebo hru).
+            draw(); 
             try {
                 //noinspection BusyWait
-                Thread.sleep(16); // Stabilních 60 FPS.
+                Thread.sleep(16); 
             } catch (InterruptedException e) {
                 Log.e("GameView", "Chyba v herní smyčce", e);
             }
@@ -80,77 +82,81 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     }
 
     private void update() {
-        bird.applyPhysics(); // Gravitace táhne ptáčka k zemi.
+        bird.applyPhysics(); 
 
-        // Pokud ptáček vyletí z obrazovky nebo spadne, konec hry.
         if (bird.getY() + bird.getRadius() > screenHeight - 100 || bird.getY() - bird.getRadius() < 0) {
-            gameOver();
+            handleGameOver();
         }
 
-        // Nastavení parametrů podle zvolené obtížnosti.
         int baseSpeed = 10;
         int speedStep = 10;
-        if (difficulty == 0) { baseSpeed = 7; speedStep = 15; } // LEHKÁ: pomalejší start i zrychlování.
-        if (difficulty == 2) { baseSpeed = 14; speedStep = 7; } // TĚŽKÁ: rychlý start a drsné zrychlování.
+        if (difficulty == 0) { baseSpeed = 7; speedStep = 15; } 
+        if (difficulty == 2) { baseSpeed = 14; speedStep = 7; }
 
         int currentSpeed = baseSpeed + (score / speedStep);
-        if (currentSpeed > 30) currentSpeed = 30; // Maximální rozumná rychlost.
+        if (currentSpeed > 30) currentSpeed = 30;
 
-        // Generování nových překážek.
         if (screenWidth > 0) {
-            // Vzdálenost trubek se mění podle obtížnosti.
             int obstacleDistance = (difficulty == 0) ? 1000 : (difficulty == 2 ? 650 : 800);
             if (obstacles.isEmpty() || obstacles.get(obstacles.size() - 1).getX() < screenWidth - obstacleDistance) {
-                
-                // Zjistíme výšku poslední trubky, abychom na ni mohli navázat.
                 int lastHeight = -1;
                 if (!obstacles.isEmpty()) {
                     lastHeight = obstacles.get(obstacles.size() - 1).getTopPipeHeight();
                 }
-                
-                // Přidání nové trubky s informací o té minulé.
                 obstacles.add(new Obstacle(screenWidth, screenHeight - 100, currentSpeed, lastHeight));
             }
         }
 
-        // Pohyb a kolize všech trubek.
         Iterator<Obstacle> iterator = obstacles.iterator();
         while (iterator.hasNext()) {
             Obstacle obstacle = iterator.next();
             obstacle.moveToLeft();
 
-            // Přičtení bodu při úspěšném průletu.
             if (!obstacle.isPassed() && bird.getX() > obstacle.getX() + obstacle.getWidth()) {
                 score++;
                 obstacle.setPassed(true);
+                soundManager.playPoint();
             }
 
-            // Pokud narazíme, konec.
             if (obstacle.isColliding(bird)) {
-                gameOver();
+                handleGameOver();
                 return;
             }
 
-            // Smazání trubky co už uletěla mimo displej.
             if (obstacle.getX() + obstacle.getWidth() < 0) {
                 iterator.remove();
             }
         }
     }
 
-    // Volá se při nárazu nebo pádu.
+    private void handleGameOver() {
+        if (isDying) return; 
+        isDying = true; 
+        soundManager.playHit(); 
+
+        new Thread(() -> {
+            try {
+                Thread.sleep(600); 
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            post(() -> {
+                gameOver();
+                isDying = false; 
+            });
+        }).start();
+    }
+
     private void gameOver() {
-        isPlaying = false; // Návrat do menu.
-        // Kontrola a uložení nového rekordu pro danou obtížnost.
+        isPlaying = false;
         if (score > highScores[difficulty]) {
             highScores[difficulty] = score;
             saveHighScore();
         }
-        bird.reset(screenHeight / 2); // Reset ptáčka na střed.
-        obstacles.clear(); // Vyčistit staré trubky.
+        bird.reset(screenHeight / 2);
+        obstacles.clear();
     }
 
-    // Uložení rekordu do paměti mobilu.
     private void saveHighScore() {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putInt("highScore_" + difficulty, highScores[difficulty]);
@@ -162,15 +168,14 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             Canvas canvas = holder.lockCanvas();
             if (canvas != null) {
                 if (renderer != null) {
-                    renderer.drawBackground(canvas); // Pozadí.
+                    renderer.drawBackground(canvas);
                     if (!isPlaying) {
-                        // Vykreslení menu se správným skóre a rekordem.
                         renderer.drawMenu(canvas, score, highScores[difficulty], skinIndex, difficulty, 
-                                        startButtonRect, arrowLeftRect, arrowRightRect,
-                                        easyBtnRect, normalBtnRect, hardBtnRect);
+                                        soundManager.isMuted(), startButtonRect, arrowLeftRect, arrowRightRect,
+                                        easyBtnRect, normalBtnRect, hardBtnRect, soundBtnRect);
                     } else {
-                        // Vykreslení samotné hry.
-                        renderer.drawGame(canvas, bird, obstacles, score, skinIndex);
+                        // Přidáváme isMuted a soundBtnRect i pro hru.
+                        renderer.drawGame(canvas, bird, obstacles, score, skinIndex, soundManager.isMuted(), soundBtnRect);
                     }
                 }
                 holder.unlockCanvasAndPost(canvas);
@@ -185,13 +190,17 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             int x = (int) event.getX();
             int y = (int) event.getY();
 
+            // Kliknutí na zvuk funguje v menu i během hry.
+            if (soundBtnRect.contains(x, y)) {
+                soundManager.toggleMute();
+                saveMuteState();
+                return true; // Událost zpracována.
+            }
+
             if (!isPlaying) {
-                // Přepínání obtížnosti v menu - VYNULUJEME SCORE, aby se nepřenášelo.
                 if (easyBtnRect.contains(x, y)) { difficulty = 0; score = 0; saveDifficulty(); }
                 else if (normalBtnRect.contains(x, y)) { difficulty = 1; score = 0; saveDifficulty(); }
                 else if (hardBtnRect.contains(x, y)) { difficulty = 2; score = 0; saveDifficulty(); }
-                
-                // Přepínání skinů.
                 else if (arrowLeftRect.contains(x, y)) {
                     skinIndex = (skinIndex - 1 + renderer.getSkinsCount()) % renderer.getSkinsCount();
                     saveSkin();
@@ -199,15 +208,13 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
                     skinIndex = (skinIndex + 1) % renderer.getSkinsCount();
                     saveSkin();
                 } 
-                
-                // Start hry.
                 else if (startButtonRect.contains(x, y)) {
                     score = 0;
                     isPlaying = true;
                 }
-            } else {
-                // Během hry klepnutí znamená skok.
+            } else if (!isDying) {
                 bird.jump();
+                soundManager.playJump();
             }
         }
         return true;
@@ -222,6 +229,12 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     private void saveDifficulty() {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putInt("difficulty", difficulty);
+        editor.apply();
+    }
+    
+    private void saveMuteState() {
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean("isMuted", soundManager.isMuted());
         editor.apply();
     }
 
