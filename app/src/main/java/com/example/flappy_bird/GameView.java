@@ -31,16 +31,17 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     private int screenWidth, screenHeight; 
     
     private final Rect startButtonRect = new Rect();
-    private final Rect arrowLeftRect = new Rect();
+    private final Rect arrowLeftRect = new Rect(); 
     private final Rect arrowRightRect = new Rect();
     private final Rect easyBtnRect = new Rect();
     private final Rect normalBtnRect = new Rect();
     private final Rect hardBtnRect = new Rect();
     private final Rect soundBtnRect = new Rect();
     
-    // Nové Recty pro správu hráčů na serveru.
     private final Rect addPlayerBtnRect = new Rect();
     private final Rect deletePlayerBtnRect = new Rect();
+    private final Rect skinLeftRect = new Rect();
+    private final Rect skinRightRect = new Rect();
     
     private GameRenderer renderer;
     private final SoundManager soundManager;
@@ -51,7 +52,6 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     private int difficulty = 1; 
     private final SharedPreferences prefs;
 
-    // --- ONLINE LOGIKA ---
     private List<NetworkManager.PlayerModel> onlinePlayers = new ArrayList<>();
     private int currentPlayerIndex = -1;
     private boolean isOnline = false;
@@ -66,8 +66,6 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
 
         prefs = context.getSharedPreferences("FlappyBirdPrefs", Context.MODE_PRIVATE);
         loadLocalData();
-        
-        // Při startu zkusíme server.
         refreshPlayersFromServer();
     }
 
@@ -80,7 +78,6 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         soundManager.setMuted(prefs.getBoolean("isMuted", false));
     }
 
-    // Funkce, která zkusí stáhnout hráče ze serveru.
     private void refreshPlayersFromServer() {
         NetworkManager.getApi().getPlayers().enqueue(new Callback<List<NetworkManager.PlayerModel>>() {
             @Override
@@ -88,14 +85,19 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
                 if (response.isSuccessful() && response.body() != null) {
                     onlinePlayers = response.body();
                     isOnline = true;
-                    if (currentPlayerIndex == -1 && !onlinePlayers.isEmpty()) currentPlayerIndex = 0;
+                    
+                    // Bezpečná správa indexu po načtení dat
+                    if (onlinePlayers.isEmpty()) {
+                        currentPlayerIndex = -1;
+                    } else if (currentPlayerIndex == -1 || currentPlayerIndex >= onlinePlayers.size()) {
+                        currentPlayerIndex = 0;
+                    }
                     updateScoresFromCurrentPlayer();
                 }
             }
-
             @Override
             public void onFailure(Call<List<NetworkManager.PlayerModel>> call, Throwable t) {
-                isOnline = false; // Server nejede -> jsme offline.
+                isOnline = false;
                 Log.e("GameView", "Server offline: " + t.getMessage());
             }
         });
@@ -118,7 +120,6 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             }
             draw(); 
             try {
-                //noinspection BusyWait
                 Thread.sleep(16); 
             } catch (InterruptedException e) {
                 Log.e("GameView", "Chyba v herní smyčce", e);
@@ -184,7 +185,6 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
 
     private void gameOver() {
         isPlaying = false;
-        // Pokud jsme online, pošleme rekord na server.
         if (score > highScores[difficulty]) {
             highScores[difficulty] = score;
             if (isOnline && currentPlayerIndex != -1) {
@@ -198,14 +198,11 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     }
 
     private void sendScoreToServer() {
+        if (currentPlayerIndex < 0 || currentPlayerIndex >= onlinePlayers.size()) return;
         String name = onlinePlayers.get(currentPlayerIndex).name;
         NetworkManager.getApi().updateScore(new NetworkManager.ScoreUpdateModel(name, difficulty, score)).enqueue(new Callback<Void>() {
-            @Override
-            public void onResponse(Call<Void> call, Response<Void> response) {
-                refreshPlayersFromServer(); // Aktualizujeme data.
-            }
-            @Override
-            public void onFailure(Call<Void> call, Throwable t) {}
+            @Override public void onResponse(Call<Void> call, Response<Void> response) { refreshPlayersFromServer(); }
+            @Override public void onFailure(Call<Void> call, Throwable t) {}
         });
     }
 
@@ -222,11 +219,12 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
                 if (renderer != null) {
                     renderer.drawBackground(canvas);
                     if (!isPlaying) {
-                        String playerName = (isOnline && currentPlayerIndex != -1) ? onlinePlayers.get(currentPlayerIndex).name : "OFFLINE";
+                        String playerName = (isOnline && currentPlayerIndex >= 0 && currentPlayerIndex < onlinePlayers.size()) 
+                                            ? onlinePlayers.get(currentPlayerIndex).name : "OFFLINE";
                         renderer.drawMenu(canvas, score, highScores[difficulty], skinIndex, difficulty, 
                                         soundManager.isMuted(), playerName, isOnline, startButtonRect, arrowLeftRect, arrowRightRect,
                                         easyBtnRect, normalBtnRect, hardBtnRect, soundBtnRect,
-                                        addPlayerBtnRect, deletePlayerBtnRect);
+                                        addPlayerBtnRect, deletePlayerBtnRect, skinLeftRect, skinRightRect);
                     } else {
                         renderer.drawGame(canvas, bird, obstacles, score, skinIndex, soundManager.isMuted(), soundBtnRect);
                     }
@@ -250,27 +248,42 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             }
 
             if (!isPlaying) {
-                // Přepínání hráčů (online).
+                // Přepínání hráčů (online)
                 if (isOnline && !onlinePlayers.isEmpty()) {
                     if (arrowLeftRect.contains(x, y)) {
                         currentPlayerIndex = (currentPlayerIndex - 1 + onlinePlayers.size()) % onlinePlayers.size();
                         updateScoresFromCurrentPlayer();
                         score = 0;
+                        return true;
                     } else if (arrowRightRect.contains(x, y)) {
                         currentPlayerIndex = (currentPlayerIndex + 1) % onlinePlayers.size();
                         updateScoresFromCurrentPlayer();
                         score = 0;
+                        return true;
                     }
                 }
                 
-                // Přidání / Smazání hráče.
-                if (isOnline && addPlayerBtnRect.contains(x, y)) showAddPlayerDialog();
-                if (isOnline && deletePlayerBtnRect.contains(x, y)) deleteCurrentPlayer();
+                // Přidání / Smazání hráče (online)
+                if (isOnline) {
+                    if (addPlayerBtnRect.contains(x, y)) { showAddPlayerDialog(); return true; }
+                    if (deletePlayerBtnRect.contains(x, y)) { deleteCurrentPlayer(); return true; }
+                }
 
-                // Ostatní nastavení.
+                // Přepínání skinů
+                if (skinLeftRect.contains(x, y)) {
+                    skinIndex = (skinIndex - 1 + renderer.getSkinsCount()) % renderer.getSkinsCount();
+                    saveSkin();
+                    return true;
+                } else if (skinRightRect.contains(x, y)) {
+                    skinIndex = (skinIndex + 1) % renderer.getSkinsCount();
+                    saveSkin();
+                    return true;
+                }
+
+                // Ostatní nastavení
                 if (easyBtnRect.contains(x, y)) { difficulty = 0; score = 0; updateScoresFromCurrentPlayer(); saveDifficulty(); }
                 else if (normalBtnRect.contains(x, y)) { difficulty = 1; score = 0; updateScoresFromCurrentPlayer(); saveDifficulty(); }
-                else if (hardBtnRect.contains(x, y)) { difficulty = 2; score = 0; saveDifficulty(); }
+                else if (hardBtnRect.contains(x, y)) { difficulty = 2; score = 0; updateScoresFromCurrentPlayer(); saveDifficulty(); }
                 else if (startButtonRect.contains(x, y)) { score = 0; isPlaying = true; }
             } else if (!isDying) {
                 bird.jump();
@@ -281,14 +294,13 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     }
 
     private void showAddPlayerDialog() {
-        // Tady využijeme standardní Android dialog pro zadání jména.
         EditText input = new EditText(getContext());
         new AlertDialog.Builder(getContext())
             .setTitle("Nový hráč")
             .setMessage("Zadej jméno:")
             .setView(input)
             .setPositiveButton("OK", (dialog, which) -> {
-                String name = input.getText().toString();
+                String name = input.getText().toString().trim();
                 if (!name.isEmpty()) {
                     NetworkManager.getApi().addPlayer(new NetworkManager.PlayerModel(name)).enqueue(new Callback<Void>() {
                         @Override public void onResponse(Call<Void> call, Response<Void> response) { refreshPlayersFromServer(); }
@@ -301,10 +313,14 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
     }
 
     private void deleteCurrentPlayer() {
-        if (currentPlayerIndex != -1) {
+        if (isOnline && currentPlayerIndex >= 0 && currentPlayerIndex < onlinePlayers.size()) {
             String name = onlinePlayers.get(currentPlayerIndex).name;
             NetworkManager.getApi().deletePlayer(new NetworkManager.PlayerModel(name)).enqueue(new Callback<Void>() {
-                @Override public void onResponse(Call<Void> call, Response<Void> response) { refreshPlayersFromServer(); }
+                @Override 
+                public void onResponse(Call<Void> call, Response<Void> response) { 
+                    currentPlayerIndex = -1;
+                    refreshPlayersFromServer(); 
+                }
                 @Override public void onFailure(Call<Void> call, Throwable t) {}
             });
         }
@@ -322,7 +338,7 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
         editor.apply();
     }
 
-    private void saveSkin() { // Pro skiny (zůstalo lokální pro jednoduchost).
+    private void saveSkin() {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putInt("skinIndex", skinIndex);
         editor.apply();
