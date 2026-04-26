@@ -23,9 +23,9 @@ import java.util.List;
 public class GameRenderer {
 
     // Paint objekty pro různé styly vykreslování (texty, UI tvary).
-    private final Paint textPaint; 
-    private final Paint uiPaint; 
-    private final int screenWidth, screenHeight; 
+    private final Paint textPaint;
+    private final Paint uiPaint;
+    private final int screenWidth, screenHeight;
     
     // Cache bitmapy pro statické nebo často opakované grafické prvky.
     private Bitmap birdBodyBitmap;
@@ -211,7 +211,7 @@ public class GameRenderer {
         drawBird(canvas, bird, skinIndex);
         
         // Vykreslení tlačítka zvuku.
-        soundBtn.set(50, 50, 150, 150);
+        soundBtn.set(30, 30, 160, 160);
         Drawable icon = isMuted ? soundOffDrawable : soundOnDrawable;
         if (icon != null) { icon.setBounds(soundBtn); icon.draw(canvas); }
 
@@ -231,7 +231,8 @@ public class GameRenderer {
                          String playerName, boolean isOnline,
                          Rect startButtonRect, Rect arrowLeftRect, Rect arrowRightRect,
                          Rect easyBtn, Rect normalBtn, Rect hardBtn, Rect soundBtn,
-                         Rect addBtn, Rect deleteBtn, Rect skinLeftRect, Rect skinRightRect) {
+                         Rect addBtn, Rect deleteBtn, Rect skinLeftRect, Rect skinRightRect,
+                         Rect onlineToggleRect, Rect offlineToggleRect, boolean forcedOffline) {
         float centerX = (float) screenWidth / 2;
 
         // Nadpis hry.
@@ -240,11 +241,11 @@ public class GameRenderer {
         textPaint.setFakeBoldText(true);
         textPaint.setShadowLayer(12, 6, 6, Color.BLACK);
         textPaint.setTextAlign(Paint.Align.CENTER);
-        canvas.drawText("FLAPPY BIRD", centerX, (float) screenHeight * 0.18f, textPaint);
+        canvas.drawText("FLAPPY BIRD", centerX, (float) screenHeight * 0.15f, textPaint);
         textPaint.setShadowLayer(0, 0, 0, 0); 
 
         // Score board plocha.
-        rectFHelper.set(centerX - 380, (float) screenHeight * 0.26f, centerX + 380, (float) screenHeight * 0.46f);
+        rectFHelper.set(centerX - 420, (float) screenHeight * 0.26f, centerX + 420, (float) screenHeight * 0.48f);
         uiPaint.setColor(colorBoard);
         canvas.drawRoundRect(rectFHelper, 30, 30, uiPaint);
         uiPaint.setColor(colorBoardBorder);
@@ -253,36 +254,45 @@ public class GameRenderer {
         canvas.drawRoundRect(rectFHelper, 30, 30, uiPaint);
         uiPaint.setStyle(Paint.Style.FILL);
 
-        // Identifikace hráče.
-        textPaint.setTextSize(55);
-        textPaint.setColor(isOnline ? Color.BLUE : Color.RED);
-        canvas.drawText(playerName, centerX, (float) screenHeight * 0.32f, textPaint);
+        // --- PŘEPÍNAČ ONLINE / OFFLINE ---
+        float toggleY = (float) screenHeight * 0.22f;
+        int tWidth = 230;
+        int tHeight = 80;
         
-        // Ovládací prvky pro online profil.
-        if (isOnline) {
-            textPaint.setTextSize(90);
+        offlineToggleRect.set((int)centerX - tWidth - 10, (int)toggleY - tHeight/2, (int)centerX - 10, (int)toggleY + tHeight/2);
+        onlineToggleRect.set((int)centerX + 10, (int)toggleY - tHeight/2, (int)centerX + tWidth + 10, (int)toggleY + tHeight/2);
+        
+        drawModeButton(canvas, offlineToggleRect, "OFFLINE", forcedOffline);
+        drawModeButton(canvas, onlineToggleRect, "ONLINE", !forcedOffline);
+
+        // Identifikace hráče a rekordy.
+        textPaint.setTextSize(55);
+        textPaint.setColor(isOnline && !forcedOffline ? Color.BLUE : Color.RED);
+        canvas.drawText(playerName, centerX, (float) screenHeight * 0.33f, textPaint);
+        
+        if (isOnline && !forcedOffline) {
+            textPaint.setTextSize(100);
             textPaint.setColor(colorBoardBorder);
-            canvas.drawText("<", centerX - 320, (float) screenHeight * 0.33f, textPaint);
-            canvas.drawText(">", centerX + 320, (float) screenHeight * 0.33f, textPaint);
+            canvas.drawText("<", centerX - 350, (float) screenHeight * 0.34f, textPaint);
+            canvas.drawText(">", centerX + 350, (float) screenHeight * 0.34f, textPaint);
             
-            arrowLeftRect.set((int)centerX - 380, (int)(screenHeight * 0.26f), (int)centerX - 200, (int)(screenHeight * 0.38f));
-            arrowRightRect.set((int)centerX + 200, (int)(screenHeight * 0.26f), (int)centerX + 380, (int)(screenHeight * 0.38f));
+            arrowLeftRect.set((int)centerX - 420, (int)(screenHeight * 0.26f), (int)centerX - 220, (int)(screenHeight * 0.40f));
+            arrowRightRect.set((int)centerX + 220, (int)(screenHeight * 0.26f), (int)centerX + 420, (int)(screenHeight * 0.40f));
             
-            addBtn.set((int)centerX + 180, (int)(screenHeight * 0.40f), (int)centerX + 360, (int)(screenHeight * 0.46f));
-            deleteBtn.set((int)centerX - 360, (int)(screenHeight * 0.40f), (int)centerX - 180, (int)(screenHeight * 0.46f));
-            textPaint.setTextSize(45);
-            canvas.drawText("+ NEW", addBtn.centerX(), addBtn.centerY() + 15, textPaint);
-            canvas.drawText("DEL -", deleteBtn.centerX(), deleteBtn.centerY() + 15, textPaint);
+            addBtn.set((int)centerX + 180, (int)(screenHeight * 0.41f), (int)centerX + 400, (int)(screenHeight * 0.48f));
+            deleteBtn.set((int)centerX - 400, (int)(screenHeight * 0.41f), (int)centerX - 180, (int)(screenHeight * 0.48f));
+            textPaint.setTextSize(48);
+            canvas.drawText("+ NEW", addBtn.centerX(), addBtn.centerY() + 18, textPaint);
+            canvas.drawText("DEL -", deleteBtn.centerX(), deleteBtn.centerY() + 18, textPaint);
         }
 
-        // Statistiky skóre.
         textPaint.setTextSize(60);
         textPaint.setColor(colorBoardBorder);
-        canvas.drawText("SCORE: " + score, centerX, (float) screenHeight * 0.38f, textPaint);
-        canvas.drawText("BEST: " + highScore, centerX, (float) screenHeight * 0.43f, textPaint);
+        canvas.drawText("SCORE: " + score, centerX, (float) screenHeight * 0.39f, textPaint);
+        canvas.drawText("BEST: " + highScore, centerX, (float) screenHeight * 0.45f, textPaint);
 
         // Přepínače obtížnosti.
-        float diffY = (float) screenHeight * 0.54f;
+        float diffY = (float) screenHeight * 0.56f;
         int btnW = 230; int btnH = 100; int spacing = 15;
         easyBtn.set((int)centerX - btnW - btnW/2 - spacing, (int)diffY - btnH/2, (int)centerX - btnW/2 - spacing, (int)diffY + btnH/2);
         normalBtn.set((int)centerX - btnW/2, (int)diffY - btnH/2, (int)centerX + btnW/2, (int)diffY + btnH/2);
@@ -293,7 +303,7 @@ public class GameRenderer {
         uiPaint.setStrokeWidth(1); 
 
         // Náhled a přepínání skinů.
-        float skinY = (float) screenHeight * 0.68f;
+        float skinY = (float) screenHeight * 0.72f;
         if (birdBodyBitmap != null && birdDetailsBitmap != null) {
             Paint skinPaint = new Paint();
             skinPaint.setColorFilter(new PorterDuffColorFilter(skinColors[skinIndex], PorterDuff.Mode.SRC_IN));
@@ -301,13 +311,13 @@ public class GameRenderer {
             canvas.drawBitmap(birdDetailsBitmap, centerX - 60, skinY - 60, null);
         }
 
-        textPaint.setTextSize(100);
+        textPaint.setTextSize(110);
         textPaint.setColor(Color.WHITE);
-        canvas.drawText("<", centerX - 180, skinY + 30, textPaint);
-        canvas.drawText(">", centerX + 180, skinY + 30, textPaint);
+        canvas.drawText("<", centerX - 200, skinY + 35, textPaint);
+        canvas.drawText(">", centerX + 200, skinY + 35, textPaint);
         
-        skinLeftRect.set((int)centerX - 250, (int)skinY - 80, (int)centerX - 100, (int)skinY + 80);
-        skinRightRect.set((int)centerX + 100, (int)skinY - 80, (int)centerX + 250, (int)skinY + 80);
+        skinLeftRect.set((int)centerX - 280, (int)skinY - 90, (int)centerX - 120, (int)skinY + 90);
+        skinRightRect.set((int)centerX + 120, (int)skinY - 90, (int)centerX + 280, (int)skinY + 90);
 
         // Hlavní startovní tlačítko.
         int bY = (int) (screenHeight * 0.88f);
@@ -318,9 +328,25 @@ public class GameRenderer {
         canvas.drawText("START", centerX, bY + 30, textPaint);
 
         // Indikátor a tlačítko zvuku.
-        soundBtn.set(50, 50, 150, 150);
+        soundBtn.set(30, 30, 160, 160);
         Drawable icon = isMuted ? soundOffDrawable : soundOnDrawable;
         if (icon != null) { icon.setBounds(soundBtn); icon.draw(canvas); }
+    }
+
+    /**
+     * Pomocná metoda pro vykreslení tlačítka režimu (Online/Offline).
+     */
+    private void drawModeButton(Canvas canvas, Rect rect, String label, boolean isSelected) {
+        uiPaint.setColor(isSelected ? colorDiffSelected : colorDiffUnselected);
+        canvas.drawRoundRect(new RectF(rect), 15, 15, uiPaint);
+        uiPaint.setColor(colorBoardBorder);
+        uiPaint.setStyle(Paint.Style.STROKE);
+        uiPaint.setStrokeWidth(isSelected ? 6 : 2);
+        canvas.drawRoundRect(new RectF(rect), 15, 15, uiPaint);
+        uiPaint.setStyle(Paint.Style.FILL);
+        textPaint.setTextSize(32);
+        textPaint.setColor(isSelected ? colorBoardBorder : Color.DKGRAY);
+        canvas.drawText(label, rect.centerX(), rect.centerY() + 12, textPaint);
     }
 
     /**
