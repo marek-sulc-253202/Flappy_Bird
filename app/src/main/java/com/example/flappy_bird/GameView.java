@@ -160,10 +160,10 @@ public class GameView extends SurfaceView implements Runnable, SurfaceHolder.Cal
             if (isPlaying && !isDying) {
                 update(); 
             }
-            draw(); 
+            draw();
             try {
                 //noinspection BusyWait
-                Thread.sleep(16); 
+                Thread.sleep(12); // Více jak 60 FPS (asi 80+-)
             } catch (InterruptedException e) {
                 Log.e("GameView", "Chyba v herní smyčce", e);
             }
