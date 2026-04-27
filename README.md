@@ -66,7 +66,7 @@ Server běží na notebooku a slouží jako centrální databáze.
 1. Otevři projekt v **Android Studiu**.
 2. Připoj mobilní zařízení (nebo emulátor) a spusť aplikaci pomocí tlačítka **Run**.
 3. V hlavním menu aplikace klikni na tlačítko **ONLINE**.
-4. Zadej IP adresu nebo hostname (např. `MarekLenovo.local`) svého notebooku. Aplikace automaticky doplní protokol i port.
+4. Zadej IP adresu nebo hostname (`[hostname].local`) svého notebooku. Aplikace automaticky doplní protokol i port.
 5. **Důležité:** Pro online režim musí být mobil i notebook na stejné síti (např. hotspot z mobilu).
 
 ---
